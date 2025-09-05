@@ -8,13 +8,13 @@ const Header = ({ backendStatus }) => {
       <div className="flex items-center space-x-4">
         <div className="flex items-center">
           <Globe className="text-blue-400 mr-2" size={24} />
-          <span className="text-white font-semibold">Uganda Development Portal</span>
+          <span className="text-white font-semibold">Uganda Education Portal</span>
         </div>
         <div className="hidden md:flex items-center bg-gray-700 rounded-lg px-3 py-2">
           <Search className="text-gray-400 mr-2" size={16} />
           <input 
             type="text" 
-            placeholder="Search data, reports..." 
+            placeholder="Search education data..." 
             className="bg-transparent text-white text-sm outline-none placeholder-gray-400"
           />
         </div>
@@ -23,7 +23,7 @@ const Header = ({ backendStatus }) => {
       <div className="flex items-center space-x-4">
         <div className="hidden md:flex items-center text-gray-300 text-sm">
           <Calendar className="mr-2" size={16} />
-          <span>Last Updated: July 23, 2025</span>
+          <span>UNESCO Institute for Statistics</span>
         </div>
         <button className="relative p-2 text-gray-300 hover:text-white transition-colors">
           <Bell size={20} />
