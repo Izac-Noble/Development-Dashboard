@@ -1,202 +1,155 @@
-// src/components/Dashboard/StatsCards.js
-import React, { useState, useEffect } from 'react';
-import { TrendingUp, Users, Building, GraduationCap, BookOpen, Activity } from 'lucide-react';
-import apiService from '../../services/api';
+// src/components/Dashboard/StatsCards.js - GENERIC VERSION
+import React from 'react';
+import { TrendingUp, Users, Building, GraduationCap, Heart, Activity, MapPin, DollarSign } from 'lucide-react';
 
-const StatsCards = () => {
-  const [educationData, setEducationData] = useState(null);
-  const [summary, setSummary] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    const loadEducationData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        // Fetch both education data and summary
-        const [educationResponse, summaryResponse] = await Promise.all([
-          apiService.getUgandaEducation(),
-          apiService.getEducationSummary()
-        ]);
-        
-        setEducationData(educationResponse);
-        setSummary(summaryResponse);
-        
-        console.log('Education data loaded:', educationResponse);
-        console.log('Summary loaded:', summaryResponse);
-        
-      } catch (error) {
-        console.error('Error loading education data:', error);
-        setError(error.message);
-      } finally {
-        setLoading(false);
+const StatsCards = ({ countryCode, countryName, countryInfo, educationData, healthData, economicData }) => {
+  
+  // Helper to safely extract values from different API responses
+  const extractValue = (data, path, fallback = 'N/A') => {
+    if (!data) return fallback;
+    
+    try {
+      // Handle array data (World Bank, WHO)
+      if (Array.isArray(data)) {
+        const latest = data.find(item => item.value !== null) || data[0];
+        return latest?.value || latest?.NumericValue || fallback;
       }
-    };
-
-    loadEducationData();
-  }, []);
-
-  // Helper function to find specific indicators from education data
-  const findIndicatorValue = (searchTerms, fallback = 'N/A') => {
-    if (!educationData || !educationData.data) return fallback;
-    
-    const indicator = educationData.data.find(item => 
-      searchTerms.some(term => 
-        item.indicator_name && item.indicator_name.toLowerCase().includes(term.toLowerCase())
-      )
-    );
-    
-    if (indicator && indicator.value !== null && indicator.value !== undefined) {
-      return apiService.formatEducationValue(indicator.value, indicator.unit);
+      
+      // Handle nested object data
+      if (typeof data === 'object') {
+        const keys = path.split('.');
+        let current = data;
+        for (const key of keys) {
+          current = current?.[key];
+        }
+        return current || fallback;
+      }
+      
+      return data || fallback;
+    } catch (error) {
+      console.error('Error extracting value:', error);
+      return fallback;
     }
-    
-    return fallback;
   };
 
-  // Helper function to get latest value for a category
-  const getLatestCategoryValue = (category, fallback = 'N/A') => {
-    if (!educationData || !educationData.data) return fallback;
-    
-    const categoryData = educationData.data
-      .filter(item => item.category === category && item.value !== null)
-      .sort((a, b) => parseInt(b.year) - parseInt(a.year));
-    
-    if (categoryData.length > 0) {
-      return apiService.formatEducationValue(categoryData[0].value, categoryData[0].unit);
+  // Format numbers nicely
+  const formatNumber = (value) => {
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number') {
+      if (value > 1000000) return (value / 1000000).toFixed(1) + 'M';
+      if (value > 1000) return (value / 1000).toFixed(1) + 'K';
+      return value.toFixed(0);
     }
-    
-    return fallback;
+    return value;
   };
 
+  // Build stats array with dynamic data
   const statsData = [
     {
-      title: 'Total Indicators',
-      value: loading ? 'Loading...' : (summary?.summary?.total_indicators || 0),
-      icon: Activity,
-      category: 'overview'
-    },
-    {
-      title: 'Data Points',
-      value: loading ? 'Loading...' : (summary?.summary?.data_points || 0),
-      icon: Building,
-      category: 'overview'
-    },
-    {
-      title: 'Literacy Rate',
-      value: loading ? 'Loading...' : 
-        findIndicatorValue(['literacy', 'literate'], getLatestCategoryValue('literacy')),
-      icon: BookOpen,
-      category: 'literacy'
-    },
-    {
-      title: 'Enrollment',
-      value: loading ? 'Loading...' : 
-        findIndicatorValue(['enrollment', 'enrol'], getLatestCategoryValue('enrollment')),
-      icon: GraduationCap,
-      category: 'enrollment'
-    },
-    {
-      title: 'Teachers',
-      value: loading ? 'Loading...' : 
-        findIndicatorValue(['teacher', 'instructor'], getLatestCategoryValue('teachers')),
+      title: 'Population',
+      value: economicData ? formatNumber(extractValue(economicData, 'value', 'Loading...')) : 'N/A',
       icon: Users,
-      category: 'teachers'
+      color: 'blue',
+      source: 'World Bank'
     },
     {
-      title: 'Education Budget',
-      value: loading ? 'Loading...' : 
-        findIndicatorValue(['expenditure', 'spending', 'budget'], getLatestCategoryValue('expenditure')),
-      icon: TrendingUp,
-      category: 'expenditure'
+      title: 'Capital City',
+      value: countryInfo?.[0]?.capital?.[0] || 'N/A',
+      icon: Building,
+      color: 'green',
+      source: 'Country Info'
+    },
+    {
+      title: 'Region',
+      value: countryInfo?.[0]?.region || 'N/A',
+      icon: MapPin,
+      color: 'purple',
+      source: 'Country Info'
+    },
+    {
+      title: 'Currency',
+      value: (() => {
+        const currencies = countryInfo?.[0]?.currencies;
+        if (currencies) {
+          const currencyKey = Object.keys(currencies)[0];
+          return currencies[currencyKey]?.name || 'N/A';
+        }
+        return 'N/A';
+      })(),
+      icon: DollarSign,
+      color: 'yellow',
+      source: 'Country Info'
+    },
+    {
+      title: 'Education Data',
+      value: educationData ? 
+        (Array.isArray(educationData) ? `${educationData.length} indicators` : 'Available') : 
+        'Loading...',
+      icon: GraduationCap,
+      color: 'indigo',
+      source: 'UNESCO'
+    },
+    {
+      title: 'Health Data',
+      value: healthData?.value ? 
+        `${healthData.value.length} records` : 
+        (healthData ? 'Available' : 'Loading...'),
+      icon: Heart,
+      color: 'red',
+      source: 'WHO'
     }
   ];
 
-  // Color scheme based on category
-  const getCategoryColors = (category) => {
-    switch (category) {
-      case 'overview':
-        return { border: 'border-blue-500', icon: 'text-blue-400' };
-      case 'literacy':
-        return { border: 'border-green-500', icon: 'text-green-400' };
-      case 'enrollment':
-        return { border: 'border-purple-500', icon: 'text-purple-400' };
-      case 'teachers':
-        return { border: 'border-yellow-500', icon: 'text-yellow-400' };
-      case 'expenditure':
-        return { border: 'border-red-500', icon: 'text-red-400' };
-      default:
-        return { border: 'border-gray-500', icon: 'text-gray-400' };
-    }
+  // Color scheme
+  const getColors = (color) => {
+    const colors = {
+      blue: { border: 'border-blue-500', icon: 'text-blue-400', bg: 'bg-blue-900/20' },
+      green: { border: 'border-green-500', icon: 'text-green-400', bg: 'bg-green-900/20' },
+      purple: { border: 'border-purple-500', icon: 'text-purple-400', bg: 'bg-purple-900/20' },
+      yellow: { border: 'border-yellow-500', icon: 'text-yellow-400', bg: 'bg-yellow-900/20' },
+      indigo: { border: 'border-indigo-500', icon: 'text-indigo-400', bg: 'bg-indigo-900/20' },
+      red: { border: 'border-red-500', icon: 'text-red-400', bg: 'bg-red-900/20' }
+    };
+    return colors[color] || colors.blue;
   };
 
-  if (error) {
-    return (
-      <div className="mb-8 p-4 bg-red-900 border border-red-700 rounded-lg">
-        <h3 className="text-red-400 font-semibold mb-2">Error Loading Data</h3>
-        <p className="text-red-300 text-sm">{error}</p>
-        <button 
-          onClick={() => window.location.reload()} 
-          className="mt-2 px-3 py-1 bg-red-700 hover:bg-red-600 text-white text-sm rounded"
-        >
-          Retry
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="mb-8">
-      <div className="mb-4">
-        <h2 className="text-xl font-semibold text-white">Uganda Education Statistics</h2>
-        <p className="text-gray-400 text-sm">
-          Data from UNESCO Institute for Statistics
-          {summary?.last_updated && (
-            <span className="ml-2">
-              • Last updated: {new Date(summary.last_updated).toLocaleDateString()}
-            </span>
-          )}
-        </p>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold text-white">
+          {countryName} Overview
+        </h2>
+        <div className="text-sm text-gray-400">
+          Country Code: {countryCode}
+        </div>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {statsData.map((stat, index) => {
           const Icon = stat.icon;
-          const colors = getCategoryColors(stat.category);
+          const colors = getColors(stat.color);
           
           return (
             <div 
               key={index} 
-              className={`bg-navy bg-opacity-50 p-4 rounded-lg ${colors.border} border hover:bg-opacity-70 transition-all duration-200`}
+              className={`${colors.bg} p-4 rounded-lg border ${colors.border} hover:border-opacity-75 transition-all duration-200`}
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <p className="text-gray-300 text-sm mb-1">{stat.title}</p>
-                  <p className={`text-xl font-bold text-white ${loading ? 'animate-pulse' : ''}`}>
+                  <p className="text-lg font-bold text-white mb-1">
                     {stat.value}
                   </p>
-                  <p className="text-xs text-gray-400 mt-1">UNESCO Data</p>
+                  <p className="text-xs text-gray-400">
+                    {stat.source}
+                  </p>
                 </div>
-                <Icon className={`${colors.icon} ml-3`} size={28} />
+                <Icon className={`${colors.icon} ml-2 flex-shrink-0`} size={24} />
               </div>
             </div>
           );
         })}
       </div>
-
-      {summary?.summary?.categories && (
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {Object.entries(summary.summary.categories).map(([category, count]) => (
-            <div key={category} className="bg-gray-700 p-3 rounded-lg border border-gray-600">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-300 capitalize">{category}</span>
-                <span className="text-white font-semibold">{count}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 };
